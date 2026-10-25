@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="description" content="Oracle Database memory sizing calculator: SGA/PGA split, PGA_AGGREGATE_LIMIT, HugePages count, kernel parameters, ASMM vs AMM verdict.">
+<meta name="description" content="Oracle Database memory sizing calculator: SGA/PGA split, PGA_AGGREGATE_LIMIT, HugePages count, kernel parameters, with-vs-without HugePages comparison, ASMM vs AMM verdict.">
 <title>Oracle Memory Sizer</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
 <style>
@@ -57,6 +57,9 @@ table{width:100%;border-collapse:collapse;font-size:13.5px}
 th,td{text-align:left;padding:7px 8px;border-bottom:1px solid var(--line);vertical-align:top}
 th{color:var(--muted);font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.05em}
 td.n{font-family:var(--mono);font-variant-numeric:tabular-nums;white-space:nowrap}
+#compare th.sel,#compare td.sel{background:var(--accent-soft)}
+#compare th.sel{color:var(--accent)}
+#compare td{min-width:150px}
 .tbl{overflow-x:auto}
 pre{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:12px;font:13px/1.5 var(--mono);overflow-x:auto;margin:0}
 .codehead{display:flex;justify-content:space-between;align-items:center;margin:0 0 6px}
@@ -79,20 +82,21 @@ button.copy{font:500 12px var(--sans);padding:5px 10px;border:1px solid var(--li
 <div class="grid">
 <div class="panel">
   <h2>Host</h2>
-  <div class="field"><label for="ram">Physical RAM (GB)</label><input id="ram" type="number" min="2" step="1" value="755"></div>
+  <div class="field"><label for="ram">Physical RAM (GB)</label><input id="ram" type="number" min="2" step="1" value="500"></div>
   <div class="field"><label for="inst">Database instances on this host</label><input id="inst" type="number" min="1" step="1" value="1"><div class="hint">ASM instance is counted separately.</div></div>
-  <div class="field"><label for="proc">PROCESSES per instance</label><input id="proc" type="number" min="50" step="50" value="3000"></div>
+  <div class="field"><label for="proc">PROCESSES per instance</label><input id="proc" type="number" min="50" step="50" value="2000"></div>
   <div class="field"><label>Storage</label>
     <div class="seg" id="stor"><button aria-pressed="true" data-v="asm">ASM / RAC</button><button aria-pressed="false" data-v="fs">Filesystem</button></div>
     <div class="hint">Filesystem reserves more for page cache.</div></div>
-  <div class="field"><label>HugePages available on host</label>
-    <div class="seg" id="hp"><button aria-pressed="true" data-v="yes">Yes</button><button aria-pressed="false" data-v="no">No</button></div></div>
+  <div class="field"><label>Sizing mode</label>
+    <div class="seg" id="hp"><button aria-pressed="true" data-v="yes">With HugePages</button><button aria-pressed="false" data-v="no">Without HugePages</button></div>
+    <div class="hint">Both are always compared below; this picks which one the parameter blocks are written for.</div></div>
 
   <h2 style="margin-top:20px">Workload</h2>
   <div class="field"><label>Type</label>
     <div class="seg" id="wl"><button aria-pressed="true" data-v="oltp">OLTP</button><button aria-pressed="false" data-v="mixed">Mixed</button><button aria-pressed="false" data-v="dw">DW / batch</button></div>
     <div class="hint" id="wlhint"></div></div>
-  <div class="field"><label for="dbsize">Database size (GB, optional)</label><input id="dbsize" type="number" min="0" step="10" value="4000"><div class="hint">Used only to sanity-check the buffer cache against working set.</div></div>
+  <div class="field"><label for="dbsize">Database size (GB, optional)</label><input id="dbsize" type="number" min="0" step="10" value="2500"><div class="hint">Used only to sanity-check the buffer cache against working set.</div></div>
   <div class="field"><label for="im">In-Memory column store (GB)</label><input id="im" type="number" min="0" step="1" value="0"><div class="hint">Added on top of the SGA split; static.</div></div>
 </div>
 
@@ -105,6 +109,12 @@ button.copy{font:500 12px var(--sans);padding:5px 10px;border:1px solid var(--li
     <div class="bar" id="bar"></div>
     <div class="legend"><span class="l-sga">SGA (all instances)</span><span class="l-pga">PGA limit (all instances)</span><span class="l-hd">Headroom</span><span class="l-ov">OS, GI/ASM, process overhead, agents</span></div>
     <div class="tbl" style="margin-top:12px"><table id="budget"></table></div>
+  </div>
+
+  <div class="panel">
+    <h2>With vs without HugePages, same SGA</h2>
+    <div class="tbl"><table id="compare"></table></div>
+    <p class="note">Same parameters in both columns; only the page size differs. The highlighted column is the sizing mode selected on the left.</p>
   </div>
 
   <div class="panel">
@@ -251,10 +261,28 @@ function calc(){
   if(dbsize>0){const bc=sgaInst-sp-lp-im; const pct=bc/dbsize*100;
     cn=`Buffer cache ≈ ${g(bc)} GB = ${g(pct)}% of a ${g(dbsize)} GB database. `+
        (pct>=100?'Whole database fits in cache; move memory to PGA or other instances if v$db_cache_advice shows no gain.':
-        pct>=15?'Within the 10–20% working-set rule of thumb for OLTP.':
-        pct>=5?'Below 10%; fine for DW scans, thin for OLTP — confirm with v$db_cache_advice.':
+        pct>=10?'Within the 10–20% working-set rule of thumb for OLTP.':
+        pct>=5?'Under 10%; fine for DW scans, thin for OLTP — confirm with v$db_cache_advice.':
         'Under 5% of DB size; expect physical reads to dominate unless the working set is small.');}
   $('cachenote').textContent=cn;
+
+  // ---- with vs without HugePages, same SGA ----
+  const pagesHP=Math.ceil(sgaInst*512), pages4k=Math.ceil(sgaInst*262144);
+  const pteHP_MB=pagesHP*8/1048576, pte4k_MB=pages4k*8/1048576;
+  const selW=hp?' class="sel"':'', selWO=hp?'':' class="sel"';
+  const crow=(k,a,b,tag)=>`<tr><td>${k}${tag?` <span class="flag ${tag==='DOC'?'good':'warn'}">${tag}</span>`:''}</td><td${selW}>${a}</td><td${selWO}>${b}</td></tr>`;
+  $('compare').innerHTML=
+    `<tr><th>${inst>1?'Per instance':''}</th><th${selW}>With HugePages (2 MB)${hp?' · selected':''}</th><th${selWO}>Without (4 KB)${hp?'':' · selected'}</th></tr>`+
+    crow('Pages in the SGA',num(pagesHP),num(pages4k))+
+    crow('Page tables per fully attached process',`${g(pteHP_MB,1)} MB`,`<b>${g(pte4k_MB)} MB</b>`)+
+    crow(`Page tables, ${Math.round(activeFrac*100)}% of ${num(proc*inst)} processes active`,'a few GB at most — hugetlbfs shares them',`<b>≈ ${g(ptTotal)} GB</b> on top of the ${g(overhead)} GB overhead`,'PRACTICE')+
+    crow('Can the SGA be swapped?','No — pinned from boot','Yes','DOC')+
+    crow('TLB reach (~1,536 entries)','≈ 3 GB of SGA','≈ 6 MB of SGA')+
+    crow('Memory model','ASMM; MEMORY_TARGET must be 0','ASMM (AMM would work, but blocks HugePages later)','DOC')+
+    crow('vm.nr_hugepages',num(hpPages),'0')+
+    crow('USE_LARGE_PAGES','ONLY — startup fails if the pool is short','TRUE (default) — nothing to use')+
+    crow('memlock',`${num(memlockKB)} KB (≥ 90% of RAM)`,'not needed')+
+    crow('What goes wrong','A short pool stops startup — loud and early','PageTables grows for hours, then PGA pages to swap: “the box has '+g(ram)+' GB and it is swapping”','PRACTICE');
 
   // ---- OS ----
   $('os').innerHTML=`<tr><th>Setting</th><th>Value</th><th>Derivation</th></tr>`+
