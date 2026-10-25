@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>oracle-tools · Arasu</title>
+<meta name="description" content="Single-file tools for Oracle DBAs: memory sizing and more.">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+:root{--bg:#f5f7f8;--panel:#fff;--fg:#1b2429;--muted:#5c6b73;--line:#d7dfe3;--accent:#0d6e6e;--accent-soft:#e0f0ef;
+  --sans:"IBM Plex Sans",system-ui,sans-serif;--mono:"IBM Plex Mono",ui-monospace,Menlo,monospace}
+@media (prefers-color-scheme:dark){:root{--bg:#121a1e;--panel:#1b252b;--fg:#e6ecef;--muted:#9aacb5;--line:#2e3c44;--accent:#5ec4c0;--accent-soft:#163538;color-scheme:dark}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.55 var(--sans);padding:32px max(16px,env(safe-area-inset-left)) 48px max(16px,env(safe-area-inset-right))}
+.wrap{max-width:860px;margin:0 auto}
+h1{font-size:26px;font-weight:600;margin:0 0 6px;letter-spacing:-.01em}
+.sub{color:var(--muted);margin:0 0 28px;max-width:62ch}
+.tool{display:block;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:18px 20px;text-decoration:none;color:inherit;margin-bottom:14px}
+.tool:hover{border-color:var(--accent)}
+.tool h2{font-size:18px;margin:0 0 6px;color:var(--accent)}
+.tool p{margin:0 0 8px;color:var(--fg)}
+.tool code{font-family:var(--mono);font-size:13px;background:var(--accent-soft);padding:1px 6px;border-radius:4px}
+.meta{font-size:13px;color:var(--muted)}
+footer{margin-top:36px;font-size:13px;color:var(--muted)}
+footer a{color:var(--accent)}
+</style>
+</head>
+<body>
+<div class="wrap">
+<h1>oracle-tools</h1>
+<p class="sub">Small, single-file tools for Oracle DBAs. Nothing to install: each one runs in the browser.</p>
+
+<a class="tool" href="oracle-memory-sizer/">
+  <h2>Oracle Memory Sizer</h2>
+  <p>Enter RAM, instance count, <code>PROCESSES</code>, storage type and workload. Get the SGA/PGA split,
+  <code>PGA_AGGREGATE_LIMIT</code>, <code>vm.nr_hugepages</code>, memlock, shmmax/shmall, swap, and copy-ready
+  SPFILE and sysctl blocks, with the ASMM-vs-AMM verdict.</p>
+  <div class="meta">Every rule tagged DOC (Oracle-documented) or PRACTICE (rule of thumb) · Linux / RHEL · 19c and 26ai</div>
+</a>
+
+<footer>Arasu · @arasu_oracle_dba on LinkedIn · <a href="https://arasupathi.github.io/learn-rac-with-arasu/">Learn RAC with Arasu</a> · MIT licence</footer>
+</div>
+</body>
+</html>
